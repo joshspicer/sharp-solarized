@@ -1,36 +1,46 @@
-name: build & attach vsix on release
+name: build & attach vsix
 
 on:
   release:
-    types: [published]        # fires when you click "Publish release"
-  push:
-    tags:
-      - 'v*'                  # e.g., v1.2.3
-      - '*.*.*'               # or 1.2.3
-  workflow_dispatch:
+    types: [published]               # A) fires when you click "Publish release"
+  workflow_dispatch:                 # B) manual run with inputs
     inputs:
       ref:
         description: 'Branch or tag to build (e.g., v1.2.3 or main)'
         required: false
         default: ''
+      tag:
+        description: 'Release tag to attach to (required if you want a release asset; e.g., v1.2.3)'
+        required: false
+        default: ''
+      prerelease:
+        description: 'Mark created/updated release as pre-release (manual runs)'
+        required: false
+        default: 'true'
 
 permissions:
-  contents: write
+  contents: write                    # needed to upload/attach assets
 
 jobs:
   package:
     runs-on: ubuntu-latest
     steps:
-      - name: choose ref
+      - name: choose ref + tag
         id: pick
+        shell: bash
         run: |
-          # prefer: dispatch input -> triggering ref -> default branch
-          if [ -n "${{ github.event.inputs.ref }}" ]; then
-            echo "ref=${{ github.event.inputs.ref }}" >> $GITHUB_OUTPUT
-          elif [ -n "${{ github.ref }}" ]; then
+          if [ "${{ github.event_name }}" = "release" ]; then
             echo "ref=${{ github.ref }}" >> $GITHUB_OUTPUT
+            echo "tag=${{ github.event.release.tag_name }}" >> $GITHUB_OUTPUT
+            echo "is_release=true" >> $GITHUB_OUTPUT
           else
-            echo "ref=${{ github.event.repository.default_branch }}" >> $GITHUB_OUTPUT
+            REF="${{ github.event.inputs.ref }}"
+            TAG="${{ github.event.inputs.tag }}"
+            if [ -z "$REF" ] && [ -n "$TAG" ]; then REF="refs/tags/$TAG"; fi
+            if [ -z "$REF" ]; then REF="${{ github.sha }}"; fi
+            echo "ref=$REF" >> $GITHUB_OUTPUT
+            echo "tag=$TAG" >> $GITHUB_OUTPUT
+            echo "is_release=false" >> $GITHUB_OUTPUT
           fi
 
       - name: checkout
@@ -55,15 +65,31 @@ jobs:
       - name: package extension (.vsix)
         run: npx @vscode/vsce@latest package
 
-      - name: compute vsix filename
-        id: meta
+      - name: debug list
         run: |
-          NAME=$(node -p "require('./package.json').name")
-          VER=$(node -p "require('./package.json').version")
-          echo "file=${NAME}-${VER}.vsix" >> "$GITHUB_OUTPUT"
+          echo "ref: ${{ steps.pick.outputs.ref }}"
+          echo "tag: ${{ steps.pick.outputs.tag }}"
+          ls -lah *.vsix || true
 
-      - name: upload to GitHub Release (if one exists)
-        if: github.event_name == 'release' || startsWith(github.ref, 'refs/tags/')
+      - name: upload vsix as artifact (always)
+        uses: actions/upload-artifact@v4
+        with:
+          name: vsix
+          path: "*.vsix"
+          if-no-files-found: error
+
+      - name: ensure release exists (manual runs only)
+        if: steps.pick.outputs.is_release == 'false' && steps.pick.outputs.tag != ''
         uses: softprops/action-gh-release@v2
         with:
-          files: ${{ steps.meta.outputs.file }}
+          tag_name: ${{ steps.pick.outputs.tag }}
+          prerelease: ${{ github.event.inputs.prerelease }}
+          draft: false
+
+      - name: attach vsix to release (if tag known)
+        if: steps.pick.outputs.tag != ''
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.pick.outputs.tag }}
+          files: "*.vsix"
+          fail_on_unmatched_files: true
