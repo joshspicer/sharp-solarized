@@ -1,0 +1,50 @@
+name: build & attach vsix on release
+
+on:
+  release:
+    types: [published]   # runs when a release is published (not on every push)
+
+permissions:
+  contents: write        # needed to upload assets to the release
+
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    steps:
+      - name: checkout repo at the release tag
+        uses: actions/checkout@v4
+        with:
+          # for release events, github.ref points at the tag (e.g., refs/tags/v1.2.3)
+          fetch-depth: 0
+          ref: ${{ github.ref }}
+
+      - name: setup node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      # install deps if package-lock exists; otherwise do a lightweight install
+      - name: install dependencies
+        run: |
+          if [ -f package-lock.json ]; then
+            npm ci --no-audit --no-fund
+          else
+            npm i --no-audit --no-fund
+          fi
+
+      - name: package extension (.vsix)
+        run: npx @vscode/vsce@latest package
+        # output file is usually "<name>-<version>.vsix"
+
+      - name: compute vsix filename
+        id: meta
+        shell: bash
+        run: |
+          NAME=$(node -p "require('./package.json').name")
+          VER=$(node -p "require('./package.json').version")
+          echo "file=${NAME}-${VER}.vsix" >> "$GITHUB_OUTPUT"
+
+      - name: upload .vsix to the GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ${{ steps.meta.outputs.file }}
