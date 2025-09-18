@@ -2,29 +2,49 @@ name: build & attach vsix on release
 
 on:
   release:
-    types: [published]   # runs when a release is published (not on every push)
+    types: [published]        # fires when you click "Publish release"
+  push:
+    tags:
+      - 'v*'                  # e.g., v1.2.3
+      - '*.*.*'               # or 1.2.3
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: 'Branch or tag to build (e.g., v1.2.3 or main)'
+        required: false
+        default: ''
 
 permissions:
-  contents: write        # needed to upload assets to the release
+  contents: write
 
 jobs:
   package:
     runs-on: ubuntu-latest
     steps:
-      - name: checkout repo at the release tag
+      - name: choose ref
+        id: pick
+        run: |
+          # prefer: dispatch input -> triggering ref -> default branch
+          if [ -n "${{ github.event.inputs.ref }}" ]; then
+            echo "ref=${{ github.event.inputs.ref }}" >> $GITHUB_OUTPUT
+          elif [ -n "${{ github.ref }}" ]; then
+            echo "ref=${{ github.ref }}" >> $GITHUB_OUTPUT
+          else
+            echo "ref=${{ github.event.repository.default_branch }}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: checkout
         uses: actions/checkout@v4
         with:
-          # for release events, github.ref points at the tag (e.g., refs/tags/v1.2.3)
           fetch-depth: 0
-          ref: ${{ github.ref }}
+          ref: ${{ steps.pick.outputs.ref }}
 
       - name: setup node
         uses: actions/setup-node@v4
         with:
           node-version: '20'
 
-      # install deps if package-lock exists; otherwise do a lightweight install
-      - name: install dependencies
+      - name: install deps
         run: |
           if [ -f package-lock.json ]; then
             npm ci --no-audit --no-fund
@@ -34,17 +54,16 @@ jobs:
 
       - name: package extension (.vsix)
         run: npx @vscode/vsce@latest package
-        # output file is usually "<name>-<version>.vsix"
 
       - name: compute vsix filename
         id: meta
-        shell: bash
         run: |
           NAME=$(node -p "require('./package.json').name")
           VER=$(node -p "require('./package.json').version")
           echo "file=${NAME}-${VER}.vsix" >> "$GITHUB_OUTPUT"
 
-      - name: upload .vsix to the GitHub release
+      - name: upload to GitHub Release (if one exists)
+        if: github.event_name == 'release' || startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
           files: ${{ steps.meta.outputs.file }}
