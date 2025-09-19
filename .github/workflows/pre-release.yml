@@ -57,7 +57,7 @@ jobs:
       with:
         name: vsix-pre-release
         path: "*.vsix"
-        retention-days: 30
+        retention-days: 180
         
     - name: Create GitHub pre-release
       uses: actions/create-release@v1
