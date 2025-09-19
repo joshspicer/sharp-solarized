@@ -43,7 +43,7 @@ The pre-release workflow (`/.github/workflows/pre-release.yml`) automatically:
    - Example: `1.0.20241217123045`
 3. **Packages** the extension using `vsce package`
 4. **Publishes** the extension as a pre-release to the VS Code Marketplace
-5. **Uploads** the `.vsix` file as a GitHub Actions artifact for 30 days
+5. **Uploads** the `.vsix` file as a GitHub Actions artifact for 180 days
 
 ## Pre-release Versions
 
