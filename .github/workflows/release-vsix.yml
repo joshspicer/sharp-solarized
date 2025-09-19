@@ -1,0 +1,95 @@
+name: build & attach vsix
+
+on:
+  release:
+    types: [published]               # A) fires when you click "Publish release"
+  workflow_dispatch:                 # B) manual run with inputs
+    inputs:
+      ref:
+        description: 'Branch or tag to build (e.g., v1.2.3 or main)'
+        required: false
+        default: ''
+      tag:
+        description: 'Release tag to attach to (required if you want a release asset; e.g., v1.2.3)'
+        required: false
+        default: ''
+      prerelease:
+        description: 'Mark created/updated release as pre-release (manual runs)'
+        required: false
+        default: 'true'
+
+permissions:
+  contents: write                    # needed to upload/attach assets
+
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    steps:
+      - name: choose ref + tag
+        id: pick
+        shell: bash
+        run: |
+          if [ "${{ github.event_name }}" = "release" ]; then
+            echo "ref=${{ github.ref }}" >> $GITHUB_OUTPUT
+            echo "tag=${{ github.event.release.tag_name }}" >> $GITHUB_OUTPUT
+            echo "is_release=true" >> $GITHUB_OUTPUT
+          else
+            REF="${{ github.event.inputs.ref }}"
+            TAG="${{ github.event.inputs.tag }}"
+            if [ -z "$REF" ] && [ -n "$TAG" ]; then REF="refs/tags/$TAG"; fi
+            if [ -z "$REF" ]; then REF="${{ github.sha }}"; fi
+            echo "ref=$REF" >> $GITHUB_OUTPUT
+            echo "tag=$TAG" >> $GITHUB_OUTPUT
+            echo "is_release=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ steps.pick.outputs.ref }}
+
+      - name: setup node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: install deps
+        run: |
+          if [ -f package-lock.json ]; then
+            npm ci --no-audit --no-fund
+          else
+            npm i --no-audit --no-fund
+          fi
+
+      - name: package extension (.vsix)
+        run: npx @vscode/vsce@latest package
+
+      - name: debug list
+        run: |
+          echo "ref: ${{ steps.pick.outputs.ref }}"
+          echo "tag: ${{ steps.pick.outputs.tag }}"
+          ls -lah *.vsix || true
+
+      - name: upload vsix as artifact (always)
+        uses: actions/upload-artifact@v4
+        with:
+          name: vsix
+          path: "*.vsix"
+          if-no-files-found: error
+
+      - name: ensure release exists (manual runs only)
+        if: steps.pick.outputs.is_release == 'false' && steps.pick.outputs.tag != ''
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.pick.outputs.tag }}
+          prerelease: ${{ github.event.inputs.prerelease }}
+          draft: false
+
+      - name: attach vsix to release (if tag known)
+        if: steps.pick.outputs.tag != ''
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.pick.outputs.tag }}
+          files: "*.vsix"
+          fail_on_unmatched_files: true
