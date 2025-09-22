@@ -5,8 +5,6 @@
 
 import { McpServer, RegisteredTool } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { chromium, Browser, Page } from 'playwright';
-import * as fs from 'fs';
-import * as path from 'path';
 
 let browser: Browser | null = null;
 let page: Page | null = null;
@@ -104,16 +102,11 @@ export function applyThemeValidationTools(server: McpServer): RegisteredTool[] {
 					type: 'string',
 					description: 'Path to the theme extension (.vsix file or folder)',
 					default: '/home/runner/work/sharp-solarized/sharp-solarized'
-				},
-				installExtension: {
-					type: 'boolean',
-					description: 'Attempt to install the extension automatically',
-					default: true
 				}
 			}
 		},
-		async (args) => {
-			const { headless = false, extensionPath = '/home/runner/work/sharp-solarized/sharp-solarized', installExtension = true } = args;
+		async (args: { headless?: boolean; extensionPath?: string }) => {
+			const { headless = false, extensionPath = '/home/runner/work/sharp-solarized/sharp-solarized' } = args;
 			
 			try {
 				// Close existing browser if any
@@ -123,31 +116,10 @@ export function applyThemeValidationTools(server: McpServer): RegisteredTool[] {
 					page = null;
 				}
 
-				// Launch browser with additional flags for extension installation
-				const browserArgs = [
-					'--disable-web-security', 
-					'--allow-running-insecure-content',
-					'--disable-features=VizDisplayCompositor'
-				];
-
-				// If extensionPath points to a VSIX file or directory, try to handle it
-				if (installExtension && extensionPath) {
-					const resolvedPath = path.resolve(extensionPath);
-					if (fs.existsSync(resolvedPath)) {
-						// Check if it's a VSIX file
-						if (resolvedPath.endsWith('.vsix')) {
-							// For VSIX files, we'd need a local VS Code instance
-							console.log(`Found VSIX at ${resolvedPath}, but web VS Code doesn't support direct VSIX installation`);
-						} else if (fs.statSync(resolvedPath).isDirectory()) {
-							// For development directories, we can use them with desktop VS Code
-							browserArgs.push(`--load-extension=${resolvedPath}`);
-						}
-					}
-				}
-				
+				// Launch browser with stability flags
 				browser = await chromium.launch({ 
 					headless,
-					args: browserArgs
+					args: ['--disable-web-security', '--allow-running-insecure-content', '--disable-features=VizDisplayCompositor']
 				});
 				
 				// Create page and navigate to VS Code web
@@ -169,16 +141,10 @@ export function applyThemeValidationTools(server: McpServer): RegisteredTool[] {
 				// Wait a bit more for the UI to stabilize
 				await page.waitForTimeout(2000);
 				
-				let message = `VS Code launched successfully in ${headless ? 'headless' : 'headed'} mode at https://vscode.dev. Ready for theme validation.`;
-				
-				if (installExtension && extensionPath && !extensionPath.endsWith('.vsix')) {
-					message += `\n⚠️  Note: Extension path provided (${extensionPath}) but direct installation in VS Code web is limited. For full extension testing, consider using a local VS Code instance.`;
-				}
-				
 				return {
 					content: [{
 						type: 'text' as const,
-						text: message
+						text: `VS Code launched successfully in ${headless ? 'headless' : 'headed'} mode at https://vscode.dev. Ready for theme validation.`
 					}]
 				};
 			} catch (error) {
@@ -213,7 +179,7 @@ export function applyThemeValidationTools(server: McpServer): RegisteredTool[] {
 				}
 			}
 		},
-		async (args) => {
+		async (args: { fallbackToSimilar?: boolean }) => {
 			const { fallbackToSimilar = true } = args;
 			
 			if (!page) {
@@ -375,16 +341,11 @@ export function applyThemeValidationTools(server: McpServer): RegisteredTool[] {
 					type: 'number',
 					description: 'Color difference tolerance (0-255, default: 10)',
 					default: 10
-				},
-				checkContrast: {
-					type: 'boolean',
-					description: 'Perform WCAG contrast ratio checks',
-					default: true
 				}
 			}
 		},
-		async (args) => {
-			const { captureScreenshot = true, colorTolerance = 10, checkContrast = true } = args;
+		async (args: { captureScreenshot?: boolean; colorTolerance?: number }) => {
+			const { captureScreenshot = true, colorTolerance = 10 } = args;
 			
 			if (!page) {
 				return {
@@ -397,7 +358,6 @@ export function applyThemeValidationTools(server: McpServer): RegisteredTool[] {
 
 			try {
 				const results: string[] = [];
-				const validationData: any = {};
 				
 				// Wait for editor to be ready
 				await waitForSelectorWithRetry(page, '.monaco-editor', { timeout: 10000 });
@@ -413,20 +373,13 @@ export function applyThemeValidationTools(server: McpServer): RegisteredTool[] {
 						editorBackground: getElementColor('.monaco-editor .view-lines'),
 						editorForeground: getElementColor('.monaco-editor .view-lines', 'color'),
 						activityBarBackground: getElementColor('.part.activitybar'),
-						activityBarForeground: getElementColor('.part.activitybar', 'color'),
-						sideBarBackground: getElementColor('.part.sidebar'),
-						sideBarForeground: getElementColor('.part.sidebar', 'color'),
-						statusBarBackground: getElementColor('.part.statusbar'),
-						statusBarForeground: getElementColor('.part.statusbar', 'color'),
-						titleBarBackground: getElementColor('.part.titlebar'),
-						titleBarForeground: getElementColor('.part.titlebar', 'color')
+						sideBarBackground: getElementColor('.part.sidebar')
 					};
 				});
 				
 				// Validate editor background (main color check)
 				if (colorData.editorBackground) {
 					results.push(`Editor background: ${colorData.editorBackground}`);
-					validationData.editorBackground = colorData.editorBackground;
 					
 					const actualRgb = rgbStringToValues(colorData.editorBackground);
 					const expectedRgb = hexToRgb(EXPECTED_COLORS.editorBackground);
@@ -436,98 +389,48 @@ export function applyThemeValidationTools(server: McpServer): RegisteredTool[] {
 						
 						if (distance <= colorTolerance) {
 							results.push(`✅ Editor background matches Sharp Solarized sepia tone (distance: ${distance.toFixed(2)})`);
-							validationData.editorBackgroundValid = true;
 						} else {
 							results.push(`❌ Editor background mismatch. Expected: ${EXPECTED_COLORS.editorBackground}, Got: ${colorData.editorBackground} (distance: ${distance.toFixed(2)})`);
-							validationData.editorBackgroundValid = false;
 						}
 					}
 				} else {
 					results.push('❌ Could not detect editor background color');
-					validationData.editorBackgroundValid = false;
+				}
+				
+				// Check contrast if we have both background and foreground
+				if (colorData.editorBackground && colorData.editorForeground) {
+					const bgRgb = rgbStringToValues(colorData.editorBackground);
+					const fgRgb = rgbStringToValues(colorData.editorForeground);
+					
+					if (bgRgb && fgRgb) {
+						const contrastRatio = calculateContrastRatio(bgRgb, fgRgb);
+						const wcagAA = contrastRatio >= 4.5;
+						const wcagAAA = contrastRatio >= 7.0;
+						
+						let contrastStatus = '❌';
+						if (wcagAAA) {
+							contrastStatus = '✅ AAA';
+						} else if (wcagAA) {
+							contrastStatus = '✅ AA';
+						}
+						
+						results.push(`Contrast ratio: ${contrastRatio.toFixed(2)} ${contrastStatus}`);
+					}
 				}
 				
 				// Validate other UI elements
-				const uiElements = [
-					{ name: 'Activity Bar', bg: colorData.activityBarBackground, fg: colorData.activityBarForeground },
-					{ name: 'Side Bar', bg: colorData.sideBarBackground, fg: colorData.sideBarForeground },
-					{ name: 'Status Bar', bg: colorData.statusBarBackground, fg: colorData.statusBarForeground },
-					{ name: 'Title Bar', bg: colorData.titleBarBackground, fg: colorData.titleBarForeground }
-				];
-				
-				for (const element of uiElements) {
-					if (element.bg) {
-						results.push(`${element.name} background: ${element.bg}`);
-						
-						// Check contrast ratio if both background and foreground are available
-						if (checkContrast && element.fg) {
-							const bgRgb = rgbStringToValues(element.bg);
-							const fgRgb = rgbStringToValues(element.fg);
-							
-							if (bgRgb && fgRgb) {
-								const contrastRatio = calculateContrastRatio(bgRgb, fgRgb);
-								const wcagAA = contrastRatio >= 4.5;
-								const wcagAAA = contrastRatio >= 7.0;
-								
-								let contrastStatus = '❌';
-								if (wcagAAA) {
-									contrastStatus = '✅ AAA';
-								} else if (wcagAA) {
-									contrastStatus = '✅ AA';
-								}
-								
-								results.push(`  └─ Contrast ratio: ${contrastRatio.toFixed(2)} ${contrastStatus}`);
-								validationData[`${element.name.toLowerCase().replace(' ', '')}Contrast`] = {
-									ratio: contrastRatio,
-									wcagAA,
-									wcagAAA
-								};
-							}
-						}
-					}
+				if (colorData.activityBarBackground) {
+					results.push(`Activity bar background: ${colorData.activityBarBackground}`);
 				}
-				
-				// Check for high contrast theme indicators
-				const themeIndicators = await page.evaluate(() => {
-					const bodyClasses = document.body.className;
-					const workbenchClasses = document.querySelector('.monaco-workbench')?.className || '';
-					
-					return {
-						isHighContrast: bodyClasses.includes('hc-light') || workbenchClasses.includes('hc-light'),
-						themeClasses: bodyClasses,
-						workbenchClasses
-					};
-				});
-				
-				if (themeIndicators.isHighContrast) {
-					results.push('✅ High contrast light theme detected');
-					validationData.isHighContrastTheme = true;
-				} else {
-					results.push('⚠️  High contrast theme classes not detected in DOM');
-					validationData.isHighContrastTheme = false;
+				if (colorData.sideBarBackground) {
+					results.push(`Sidebar background: ${colorData.sideBarBackground}`);
 				}
 				
 				// Take screenshot if requested
-				let screenshotPath = '';
 				if (captureScreenshot) {
-					screenshotPath = '/tmp/sharp-solarized-validation.png';
+					const screenshotPath = '/tmp/sharp-solarized-validation.png';
 					await page.screenshot({ path: screenshotPath, fullPage: true });
 					results.push(`📸 Screenshot saved to: ${screenshotPath}`);
-				}
-				
-				// Generate summary
-				results.push('\n=== VALIDATION SUMMARY ===');
-				results.push(`Color validation: ${validationData.editorBackgroundValid ? '✅' : '❌'} Editor background`);
-				results.push(`Theme detection: ${validationData.isHighContrastTheme ? '✅' : '❌'} High contrast mode`);
-				
-				if (checkContrast) {
-					const contrastChecks = Object.entries(validationData)
-						.filter(([k, v]) => k.includes('Contrast') && v && typeof v === 'object' && 'wcagAA' in v)
-						.map(([k, v]: [string, any]) => `${v.wcagAA ? '✅' : '❌'} ${k.replace('Contrast', '')}`);
-					
-					if (contrastChecks.length > 0) {
-						results.push(`Contrast ratios: ${contrastChecks.join(', ')}`);
-					}
 				}
 				
 				return {
@@ -551,19 +454,8 @@ export function applyThemeValidationTools(server: McpServer): RegisteredTool[] {
 	tools.push(server.tool(
 		'validate_file_icons',
 		'Validate Sharp Solarized file icons are correctly displayed',
-		{
-			type: 'object',
-			properties: {
-				openFolder: {
-					type: 'boolean',
-					description: 'Try to open a folder to test file icons',
-					default: true
-				}
-			}
-		},
-		async (args) => {
-			const { openFolder = true } = args;
-			
+		{},
+		async () => {
 			if (!page) {
 				return {
 					content: [{
@@ -579,8 +471,7 @@ export function applyThemeValidationTools(server: McpServer): RegisteredTool[] {
 				// Try to open file explorer if not already open
 				const explorerSelectors = [
 					'[data-id="workbench.view.explorer"]',
-					'.part.sidebar .explorer-viewlet',
-					'.explorer-viewlet'
+					'.part.sidebar .explorer-viewlet'
 				];
 				
 				let explorerOpened = false;
@@ -614,44 +505,26 @@ export function applyThemeValidationTools(server: McpServer): RegisteredTool[] {
 					const iconSelectors = [
 						'.explorer-item .monaco-icon-label .file-icon',
 						'.explorer-item .monaco-icon-label .folder-icon',
-						'.monaco-icon-label .file-icon',
-						'.monaco-icon-label .folder-icon',
 						'.file-icon',
-						'.folder-icon',
-						'.codicon-file',
-						'.codicon-folder'
+						'.folder-icon'
 					];
 					
 					const foundIcons: Array<{
 						selector: string;
 						count: number;
 						hasCustomBackground: boolean;
-						backgroundImages: string[];
-						styles: any[];
 					}> = [];
 					
 					for (const selector of iconSelectors) {
 						const elements = document.querySelectorAll(selector);
 						if (elements.length > 0) {
-							const backgroundImages: string[] = [];
-							const styles: any[] = [];
 							let hasCustomBackground = false;
 							
 							elements.forEach(element => {
 								const computedStyle = getComputedStyle(element);
 								const bgImage = computedStyle.backgroundImage;
-								const bgColor = computedStyle.backgroundColor;
-								
-								styles.push({
-									backgroundImage: bgImage,
-									backgroundColor: bgColor,
-									width: computedStyle.width,
-									height: computedStyle.height,
-									content: computedStyle.content
-								});
 								
 								if (bgImage && bgImage !== 'none' && !bgImage.includes('data:image/svg+xml')) {
-									backgroundImages.push(bgImage);
 									hasCustomBackground = true;
 								}
 							});
@@ -659,29 +532,13 @@ export function applyThemeValidationTools(server: McpServer): RegisteredTool[] {
 							foundIcons.push({
 								selector,
 								count: elements.length,
-								hasCustomBackground,
-								backgroundImages: [...new Set(backgroundImages)],
-								styles
+								hasCustomBackground
 							});
 						}
 					}
 					
-					// Also check for theme-specific icon classes
-					const themeIconClasses = document.querySelectorAll('[class*="hc-minimal"], [class*="sharp-solarized"]');
-					
-					return {
-						foundIcons,
-						themeIconCount: themeIconClasses.length,
-						bodyClasses: document.body.className,
-						iconThemeClasses: Array.from(document.querySelectorAll('*'))
-							.filter(el => el.className && typeof el.className === 'string')
-							.map(el => el.className)
-							.filter(className => className.includes('icon') || className.includes('theme'))
-							.slice(0, 10) // Limit to avoid too much data
-					};
+					return { foundIcons };
 				});
-				
-				results.push(`Found ${iconData.foundIcons.length} different icon element types`);
 				
 				let totalIcons = 0;
 				let customIconsDetected = false;
@@ -692,9 +549,10 @@ export function applyThemeValidationTools(server: McpServer): RegisteredTool[] {
 					
 					if (iconGroup.hasCustomBackground) {
 						customIconsDetected = true;
-						results.push(`    └─ Custom backgrounds detected: ${iconGroup.backgroundImages.length}`);
 					}
 				}
+				
+				results.push(`Found ${totalIcons} total file icon elements`);
 				
 				// Analyze icon theme application
 				if (customIconsDetected) {
@@ -703,36 +561,6 @@ export function applyThemeValidationTools(server: McpServer): RegisteredTool[] {
 					results.push('⚠️  File icons found but no custom backgrounds detected (may be using default icons)');
 				} else {
 					results.push('❌ No file icons detected');
-				}
-				
-				// Check for hc-minimal theme indicators
-				if (iconData.themeIconCount > 0) {
-					results.push(`✅ Found ${iconData.themeIconCount} theme-specific icon elements`);
-				}
-				
-				// Try to open a file to trigger more icons if requested
-				if (openFolder && explorerOpened) {
-					try {
-						// Look for any file or folder to interact with
-						const fileItems = await page.locator('.explorer-item, .monaco-list-row').first();
-						if (await fileItems.isVisible()) {
-							await fileItems.click();
-							await page.waitForTimeout(1000);
-							results.push('✅ Interacted with file explorer items to trigger icon rendering');
-						}
-					} catch (error) {
-						results.push('⚠️  Could not interact with file explorer items');
-					}
-				}
-				
-				// Generate icon theme validation summary
-				results.push('\n=== ICON VALIDATION SUMMARY ===');
-				results.push(`Total icons found: ${totalIcons}`);
-				results.push(`Custom icon theme: ${customIconsDetected ? '✅ Detected' : '❌ Not detected'}`);
-				results.push(`Theme classes: ${iconData.themeIconCount > 0 ? '✅ Found' : '❌ None'}`);
-				
-				if (totalIcons === 0) {
-					results.push('\n💡 Tip: Try opening a folder with files to see file icons, or ensure the hc-minimal icon theme is properly installed and selected.');
 				}
 				
 				return {
@@ -756,41 +584,20 @@ export function applyThemeValidationTools(server: McpServer): RegisteredTool[] {
 	tools.push(server.tool(
 		'close_browser',
 		'Close the browser and clean up resources',
-		{
-			type: 'object',
-			properties: {
-				force: {
-					type: 'boolean',
-					description: 'Force close even if cleanup fails',
-					default: false
-				}
-			}
-		},
-		async (args) => {
-			const { force = false } = args;
-			
+		{},
+		async () => {
 			try {
 				const results: string[] = [];
 				
 				if (page) {
-					try {
-						await page.close();
-						results.push('✅ Page closed successfully');
-					} catch (error) {
-						results.push(`⚠️  Page close warning: ${error instanceof Error ? error.message : String(error)}`);
-						if (!force) throw error;
-					}
+					await page.close();
+					results.push('✅ Page closed successfully');
 					page = null;
 				}
 				
 				if (browser) {
-					try {
-						await browser.close();
-						results.push('✅ Browser closed successfully');
-					} catch (error) {
-						results.push(`⚠️  Browser close warning: ${error instanceof Error ? error.message : String(error)}`);
-						if (!force) throw error;
-					}
+					await browser.close();
+					results.push('✅ Browser closed successfully');
 					browser = null;
 				}
 				
@@ -813,195 +620,6 @@ export function applyThemeValidationTools(server: McpServer): RegisteredTool[] {
 					content: [{
 						type: 'text' as const,
 						text: `Failed to cleanly close browser: ${error instanceof Error ? error.message : String(error)}. Resources have been forcibly released.`
-					}]
-				};
-			}
-		}
-	));
-
-	// Comprehensive validation tool
-	tools.push(server.tool(
-		'run_full_theme_validation',
-		'Run a complete validation suite for the Sharp Solarized theme',
-		{
-			type: 'object',
-			properties: {
-				headless: {
-					type: 'boolean',
-					description: 'Run validation in headless mode',
-					default: false
-				},
-				captureScreenshots: {
-					type: 'boolean',
-					description: 'Capture screenshots during validation',
-					default: true
-				},
-				extensionPath: {
-					type: 'string',
-					description: 'Path to the Sharp Solarized extension',
-					default: '/home/runner/work/sharp-solarized/sharp-solarized'
-				}
-			}
-		},
-		async (args) => {
-			const { headless = false, captureScreenshots = true, extensionPath = '/home/runner/work/sharp-solarized/sharp-solarized' } = args;
-			
-			const results: string[] = [];
-			results.push('🚀 Starting comprehensive Sharp Solarized theme validation...\n');
-			
-			try {
-				// Note: This is a guided workflow since we can't directly call other tools
-				results.push('📋 Complete Theme Validation Workflow:');
-				results.push('');
-				results.push('STEP 1: Launch VS Code');
-				results.push('  → Call: launch_vscode_with_theme');
-				results.push(`  → Options: { headless: ${headless}, extensionPath: "${extensionPath}" }`);
-				results.push('');
-				results.push('STEP 2: Apply Sharp Solarized Theme');
-				results.push('  → Call: apply_sharp_solarized_theme');
-				results.push('  → Options: { fallbackToSimilar: true }');
-				results.push('');
-				results.push('STEP 3: Validate Colors & Contrast');
-				results.push('  → Call: validate_theme_colors');
-				results.push(`  → Options: { captureScreenshot: ${captureScreenshots}, colorTolerance: 15, checkContrast: true }`);
-				results.push('');
-				results.push('STEP 4: Validate File Icons');
-				results.push('  → Call: validate_file_icons');
-				results.push('  → Options: { openFolder: true }');
-				results.push('');
-				results.push('STEP 5: Clean Up');
-				results.push('  → Call: close_browser');
-				results.push('  → Options: { force: false }');
-				results.push('');
-				results.push('🎯 Expected Validation Results:');
-				results.push('  ✅ Editor background: #f7f4e8 (sepia tone)');
-				results.push('  ✅ High contrast theme detected');
-				results.push('  ✅ WCAG AA contrast ratios (4.5:1 minimum)');
-				results.push('  ✅ Custom file icons (hc-minimal theme)');
-				results.push('  ✅ Sharp Solarized theme applied successfully');
-				results.push('');
-				results.push('💡 Run each tool in sequence for complete validation.');
-				
-				return {
-					content: [{
-						type: 'text' as const,
-						text: results.join('\n')
-					}]
-				};
-				
-			} catch (error) {
-				return {
-					content: [{
-						type: 'text' as const,
-						text: `Validation workflow setup failed: ${error instanceof Error ? error.message : String(error)}`
-					}]
-				};
-			}
-		}
-	));
-
-	// Test tool for MCP server functionality
-	tools.push(server.tool(
-		'test_mcp_tools',
-		'Test the MCP server tools without requiring browser installation',
-		{
-			type: 'object',
-			properties: {
-				skipBrowserTest: {
-					type: 'boolean',
-					description: 'Skip browser-dependent tests',
-					default: true
-				}
-			}
-		},
-		async (args) => {
-			const { skipBrowserTest = true } = args;
-			
-			const results: string[] = [];
-			results.push('🧪 Testing Sharp Solarized MCP Server Tools...\n');
-			
-			try {
-				// Test color utility functions
-				const testHex = '#f7f4e8';
-				const expectedRgb = { r: 247, g: 244, b: 232 };
-				const convertedRgb = hexToRgb(testHex);
-				
-				if (convertedRgb && convertedRgb.r === expectedRgb.r && convertedRgb.g === expectedRgb.g && convertedRgb.b === expectedRgb.b) {
-					results.push('✅ Color conversion utilities working correctly');
-				} else {
-					results.push('❌ Color conversion utilities failed');
-				}
-				
-				// Test contrast calculation
-				const whiteColor = { r: 255, g: 255, b: 255 };
-				const blackColor = { r: 0, g: 0, b: 0 };
-				const contrastRatio = calculateContrastRatio(whiteColor, blackColor);
-				
-				if (contrastRatio > 20) { // White/black should have ~21:1 contrast
-					results.push('✅ Contrast ratio calculations working correctly');
-				} else {
-					results.push('❌ Contrast ratio calculations failed');
-				}
-				
-				// Test expected color constants
-				results.push('\n📊 Sharp Solarized Color Palette:');
-				results.push(`  Editor Background: ${EXPECTED_COLORS.editorBackground}`);
-				results.push(`  Dark Accent: ${EXPECTED_COLORS.darkAccent}`);
-				results.push(`  Medium Accent: ${EXPECTED_COLORS.mediumAccent}`);
-				
-				// Test tool availability
-				results.push('\n🔧 Available MCP Tools:');
-				results.push('  1. package_extension - Package extension to VSIX');
-				results.push('  2. launch_vscode_with_theme - Launch VS Code with theme');
-				results.push('  3. apply_sharp_solarized_theme - Apply the Sharp Solarized theme');
-				results.push('  4. validate_theme_colors - Validate colors and contrast');
-				results.push('  5. validate_file_icons - Validate file icon theme');
-				results.push('  6. close_browser - Clean up browser resources');
-				results.push('  7. run_full_theme_validation - Complete validation workflow');
-				results.push('  8. test_mcp_tools - This test tool');
-				
-				if (skipBrowserTest) {
-					results.push('\n⚠️  Browser tests skipped (browser not installed)');
-					results.push('   To enable browser tests:');
-					results.push('   1. Run: npx playwright install chromium');
-					results.push('   2. Call this tool with skipBrowserTest: false');
-				} else {
-					// Test browser capabilities
-					if (!browser) {
-						results.push('\n🌐 Testing browser launch...');
-						try {
-							browser = await chromium.launch({ headless: true });
-							page = await browser.newPage();
-							results.push('✅ Browser launch successful');
-							
-							await page.goto('data:text/html,<h1>Test Page</h1>');
-							const title = await page.title();
-							results.push(`✅ Page navigation successful (title: "${title}")`);
-							
-							await browser.close();
-							browser = null;
-							page = null;
-						} catch (error) {
-							results.push(`❌ Browser test failed: ${error instanceof Error ? error.message : String(error)}`);
-						}
-					}
-				}
-				
-				results.push('\n🎯 MCP Server Status: OPERATIONAL');
-				results.push('   Ready for theme validation workflows!');
-				
-				return {
-					content: [{
-						type: 'text' as const,
-						text: results.join('\n')
-					}]
-				};
-				
-			} catch (error) {
-				return {
-					content: [{
-						type: 'text' as const,
-						text: `MCP tool testing failed: ${error instanceof Error ? error.message : String(error)}`
 					}]
 				};
 			}
