@@ -1,4 +1,4 @@
-# 🔪 Sharp Solarized
+# 🔪 Sharp Solarized - A high-contrast light theme for VS Code
 
 
 | Sharp Solarized |
