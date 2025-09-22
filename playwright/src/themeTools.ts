@@ -278,6 +278,95 @@ export function applyThemeValidationTools(server: McpServer): RegisteredTool[] {
 		}
 	));
 
+	// Tool to apply a random built-in theme
+	tools.push(server.tool(
+		'random_theme',
+		'Apply a random built-in theme to VS Code',
+		{},
+		async () => {
+			if (!page) {
+				return {
+					content: [{
+						type: 'text' as const,
+						text: 'VS Code not launched. Please run launch_vscode_with_theme first.'
+					}]
+				};
+			}
+
+			try {
+				// Open command palette
+				await page.keyboard.press('F1');
+				await page.waitForSelector('.quick-input-widget', { timeout: 5000 });
+				
+				// Search for theme preferences
+				await page.fill('.quick-input-widget input', 'Preferences: Color Theme');
+				await page.keyboard.press('Enter');
+				
+				// Wait for theme picker
+				await page.waitForSelector('.quick-input-widget', { timeout: 5000 });
+				
+				// Get all available theme options
+				const themes = await page.evaluate(() => {
+					const themeElements = document.querySelectorAll('.quick-input-list .monaco-list-row .monaco-highlighted-label');
+					return Array.from(themeElements).map(el => el.textContent?.trim()).filter(Boolean);
+				});
+				
+				if (themes.length === 0) {
+					return {
+						content: [{
+							type: 'text' as const,
+							text: 'No themes found in the theme picker.'
+						}]
+					};
+				}
+				
+				// Filter out Sharp Solarized if present to avoid conflicts
+				const availableThemes = themes.filter(theme => 
+					theme && !theme.toLowerCase().includes('sharp solarized')
+				);
+				
+				if (availableThemes.length === 0) {
+					return {
+						content: [{
+							type: 'text' as const,
+							text: 'No non-Sharp Solarized themes available.'
+						}]
+					};
+				}
+				
+				// Select a random theme
+				const randomIndex = Math.floor(Math.random() * availableThemes.length);
+				const selectedTheme = availableThemes[randomIndex];
+				
+				// Clear the search and type the selected theme name
+				await page.fill('.quick-input-widget input', selectedTheme);
+				
+				// Wait a moment for the list to update
+				await page.waitForTimeout(500);
+				
+				// Press Enter to apply the theme
+				await page.keyboard.press('Enter');
+				
+				// Wait a moment for the theme to apply
+				await page.waitForTimeout(1000);
+				
+				return {
+					content: [{
+						type: 'text' as const,
+						text: `Successfully applied random theme: "${selectedTheme}" (selected from ${availableThemes.length} available themes)`
+					}]
+				};
+			} catch (error) {
+				return {
+					content: [{
+						type: 'text' as const,
+						text: `Failed to apply random theme: ${error}`
+					}]
+				};
+			}
+		}
+	));
+
 	// Tool to close browser
 	tools.push(server.tool(
 		'close_browser',
