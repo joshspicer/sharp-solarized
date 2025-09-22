@@ -42,6 +42,7 @@ Once started, you can use the following MCP tools via AI assistants:
 
 - `/launch_vscode_with_theme` - Launch VS Code in browser for testing
 - `/apply_sharp_solarized_theme` - Apply the Sharp Solarized theme
+- `/random_theme` - Apply a random built-in theme to VS Code
 - `/validate_theme_colors` - Check if colors match expected values
 - `/validate_file_icons` - Verify custom file icons are working
 - `/close_browser` - Clean up and close browser instances
@@ -59,6 +60,20 @@ Launches VS Code in a browser for theme testing.
 
 #### `apply_sharp_solarized_theme`
 Applies the Sharp Solarized theme in the launched VS Code instance.
+
+#### `random_theme`
+Applies a random built-in theme to VS Code for testing comparison.
+
+**Behavior:**
+- Retrieves list of all available built-in themes
+- Filters out Sharp Solarized to avoid conflicts
+- Randomly selects and applies one theme
+- Returns the name of the applied theme
+
+**Use Cases:**
+- Testing theme switching functionality
+- Comparing Sharp Solarized against other themes
+- Quickly switching to different themes for contrast comparison
 
 #### `validate_theme_colors`
 Validates that theme colors match the expected Sharp Solarized palette.
