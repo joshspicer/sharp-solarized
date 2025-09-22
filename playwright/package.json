@@ -1,0 +1,22 @@
+{
+  "name": "sharp-solarized-theme-mcp",
+  "version": "0.1.0",
+  "license": "MIT",
+  "main": "./out/stdio.js",
+  "private": true,
+  "scripts": {
+    "compile": "npx tsc",
+    "watch": "npx tsc --watch --preserveWatchOutput",
+    "start-stdio": "npm run -s compile && node ./out/stdio.js"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.18.1",
+    "minimist": "^1.2.8",
+    "playwright": "^1.55.0"
+  },
+  "devDependencies": {
+    "@types/minimist": "^1.2.5",
+    "@types/node": "22.x",
+    "typescript": "^5.6.0"
+  }
+}
