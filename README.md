@@ -1,5 +1,6 @@
-# 🔪 Sharp Solarized - A high-contrast light theme for VS Code
+# 🔪 Sharp Solarized
 
+A high-contrast light VS Code theme with sepia tones.
 
 | Sharp Solarized |
 | -----------------------|
