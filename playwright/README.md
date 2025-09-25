@@ -23,7 +23,12 @@ Make sure you have all dependencies installed:
 # From the Sharp Solarized root directory
 cd playwright
 npm install
+
+# Install Playwright browser (required for automation)
+npx playwright install chromium
 ```
+
+**Note**: If browser installation fails due to network issues, you can retry later or use system-installed Chrome/Chromium as a fallback.
 
 ### Start the MCP Server
 
@@ -136,6 +141,13 @@ playwright/
 - Ensure all dependencies are installed with `npm install`
 - Check that TypeScript compiles without errors: `npm run compile`
 - Verify the MCP configuration in `.vscode/mcp.json`
+
+### Browser Installation Issues
+If `npx playwright install chromium` fails:
+- Check network connectivity and retry
+- Try installing system Chrome/Chromium as fallback
+- Use headless mode for CI environments
+- Check disk space availability
 
 ### Theme Validation Issues
 - Make sure the Sharp Solarized theme is installed in VS Code

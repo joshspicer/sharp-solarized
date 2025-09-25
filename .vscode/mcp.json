@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "sharp-solarized-theme-validation": {
+      "command": "npm",
+      "args": ["run", "start-stdio"],
+      "cwd": "./playwright",
+      "env": {
+        "NODE_ENV": "production"
+      }
+    }
+  }
+}
