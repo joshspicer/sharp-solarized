@@ -30,7 +30,10 @@ npx playwright install chromium
 
 **Note**: If browser installation fails due to network issues, you can:
 - Retry later when network is stable
-- Use system Chrome/Chromium by setting `PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1` and installing Chrome/Chromium separately
+- Use system Chrome/Chromium by setting `PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1` and installing Chrome manually:
+  - **Ubuntu/Debian**: `sudo apt-get install chromium-browser`
+  - **macOS**: `brew install chromium` or download from [Chrome website](https://www.google.com/chrome/)
+  - **Windows**: Download from [Chrome website](https://www.google.com/chrome/) or use Chocolatey: `choco install googlechrome`
 - See [Playwright's browser installation guide](https://playwright.dev/docs/browsers) for alternative installation methods
 
 ### Start the MCP Server
