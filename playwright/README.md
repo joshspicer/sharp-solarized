@@ -28,7 +28,10 @@ npm install
 npx playwright install chromium
 ```
 
-**Note**: If browser installation fails due to network issues, you can retry later or use system-installed Chrome/Chromium as a fallback.
+**Note**: If browser installation fails due to network issues, you can:
+- Retry later when network is stable
+- Use system Chrome/Chromium by setting `PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1` and installing Chrome/Chromium separately
+- See [Playwright's browser installation guide](https://playwright.dev/docs/browsers) for alternative installation methods
 
 ### Start the MCP Server
 
@@ -145,9 +148,11 @@ playwright/
 ### Browser Installation Issues
 If `npx playwright install chromium` fails:
 - Check network connectivity and retry
-- Try installing system Chrome/Chromium as fallback
-- Use headless mode for CI environments
-- Check disk space availability
+- Set `PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1` and install system Chrome/Chromium
+- Use `--force` flag to retry download: `npx playwright install chromium --force`
+- For CI environments, use headless mode and cached browser installations
+- Check disk space availability and permissions
+- See [Playwright docs](https://playwright.dev/docs/browsers#managing-browser-binaries) for advanced configuration
 
 ### Theme Validation Issues
 - Make sure the Sharp Solarized theme is installed in VS Code

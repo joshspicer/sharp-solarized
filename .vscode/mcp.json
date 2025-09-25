@@ -5,7 +5,7 @@
       "args": ["run", "start-stdio"],
       "cwd": "./playwright",
       "env": {
-        "NODE_ENV": "production"
+        "NODE_ENV": "development"
       }
     }
   }
