@@ -6,6 +6,7 @@
  */
 
 const { getServer } = require('../playwright/out/server');
+const { SHARP_SOLARIZED_COLORS, rgbToHex } = require('../playwright/out/colorUtils');
 const fs = require('fs');
 const path = require('path');
 
@@ -74,11 +75,12 @@ async function testMCPServer() {
         const editorBg = themeData.colors['editor.background'];
         console.log(`   ✅ Editor background color: ${editorBg}`);
         
-        // Check if it matches expected sepia tone
-        if (editorBg.toLowerCase() === '#f7f4e8' || editorBg.toLowerCase() === 'f7f4e8') {
-          console.log('   ✅ Matches expected sepia tone');
+        // Check if it matches expected sepia tone using imported constant
+        const expectedSepia = rgbToHex(SHARP_SOLARIZED_COLORS.editorBackground);
+        if (editorBg.toLowerCase() === expectedSepia.toLowerCase() || editorBg.toLowerCase() === expectedSepia.substring(1).toLowerCase()) {
+          console.log(`   ✅ Matches expected sepia tone (${expectedSepia})`);
         } else {
-          console.log('   ⚠️  Different from expected sepia tone (#f7f4e8)');
+          console.log(`   ⚠️  Different from expected sepia tone (${expectedSepia})`);
         }
       }
     }

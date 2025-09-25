@@ -22,9 +22,11 @@ let page: Page | null = null;
 
 /**
  * Get the path to the Sharp Solarized extension directory
+ * @returns {string} The absolute path to the repository root containing the theme files
  */
 function getExtensionPath(): string {
 	// Use repository root relative path instead of hardcoded absolute path
+	// __dirname points to playwright/out/, so ../../ gets us to the repo root
 	return path.resolve(__dirname, '../../');
 }
 
