@@ -1,5 +1,8 @@
 # 🔪 Sharp Solarized
 
+[![Install in VS Code](https://img.shields.io/badge/VS%20Code-Install-0098FF?logo=visualstudiocode&logoColor=white)](https://marketplace.visualstudio.com/items?itemName=joshspicer.sharp-solarized)
+[![Install in VS Code Insiders](https://img.shields.io/badge/VS%20Code%20Insiders-Install-24bfa5?logo=visualstudiocode&logoColor=white)](https://marketplace.visualstudio.com/items?itemName=joshspicer.sharp-solarized)
+
 
 | Sharp Solarized |
 | -----------------------|
