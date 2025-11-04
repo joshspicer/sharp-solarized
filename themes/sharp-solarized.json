@@ -90,7 +90,25 @@
 		"inlineEdit.gutterIndicator.successfulForeground": "#fff",
 		"inlineEdit.gutterIndicator.successfulBackground": "#008000",
 		"inlineEdit.gutterIndicator.successfulBorder": "#008000",
-		"inlineEdit.gutterIndicator.background": "#D2CCB850"
+		"inlineEdit.gutterIndicator.background": "#D2CCB850",
+		"chat.slashCommandBackground": "#ebeae7",
+		"chat.slashCommandForeground": "#070603",
+		"chat.avatarBackground": "#423E31",
+		"chat.avatarForeground": "#fff",
+		"chat.requestBorder": "#232018",
+		"chat.requestBackground": "#f7f4e8",
+		"diffEditor.border": "#232018",
+		"diffEditor.insertedLineBackground": "#4dd64d40",
+		"diffEditor.removedLineBackground": "#ff4d4d40",
+		"diffEditor.insertedTextBackground": "#4dd64d60", 
+		"diffEditor.removedTextBackground": "#ff4d4d60",
+		"diffEditor.unchangedRegionBackground": "#f7f4e8",
+		"diffEditor.unchangedRegionForeground": "#767470",
+		"diffEditor.unchangedCodeBackground": "#fcfaf3",
+		"chatCodeBlock.background": "#fcfaf3",
+		"chatCodeBlock.border": "#232018",
+		"inlineChatInput.border": "#232018",
+		"inlineChatInput.background": "#f7f4e8"
 	},
 	"tokenColors": [
 		{
